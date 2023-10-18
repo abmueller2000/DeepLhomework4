@@ -76,23 +76,36 @@ class Detector(torch.nn.Module):
 
     def detect(self, image):
         """
-           Your code here.
-           Implement object detection here.
-           @image: 3 x H x W image
-           @return: Three list of detections [(score, cx, cy, w/2, h/2), ...], one per class,
-                    return no more than 30 detections per image per class. You only need to predict width and height
-                    for extra credit. If you do not predict an object size, return w=0, h=0.
+        @image: 3 x H x W image
+        @return: Three list of detections [(score, cx, cy, w/2, h/2), ...], one per class,
+                return no more than 30 detections per image per class. You only need to predict width and height
+                for extra credit. If you do not predict an object size, return w=0, h=0.
         """
-        with torch.no_grad():
-            heatmap = self.forward(image.unsqueeze(0))
-            heatmap = torch.sigmoid(heatmap).squeeze(0)
+        # Forward pass to get the predicted heatmaps
+        predicted_heatmaps = self.forward(image.unsqueeze(0))
         
-        detections = []
-        for i in range(heatmap.shape[0]):
-            peaks = extract_peak(heatmap[i])
-            detections.append([(score, cx, cy, 0, 0) for score, cx, cy in peaks])
+        # Initialize empty lists to store detections for each class
+        kart_detections = []
+        bomb_detections = []
+        pickup_detections = []
         
-        return detections
+        # Extract peaks from the predicted heatmaps
+        for i, label in enumerate(['kart', 'bomb', 'pickup']):
+            heatmap = predicted_heatmaps[0, i]
+            peaks = extract_peak(heatmap)
+            
+            # Populate the detections list for each class
+            for peak in peaks:
+                score, x, y = peak
+                if label == 'kart':
+                    kart_detections.append((score, x, y, 0, 0))
+                elif label == 'bomb':
+                    bomb_detections.append((score, x, y, 0, 0))
+                elif label == 'pickup':
+                    pickup_detections.append((score, x, y, 0, 0))
+                    
+        # Return detections as a tuple of lists
+        return kart_detections, bomb_detections, pickup_detections
 
 
 def save_model(model):

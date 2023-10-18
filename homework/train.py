@@ -9,6 +9,7 @@ import torch.utils.tensorboard as tb
 
 def train(args):
     from os import path
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     model = Detector().to(device)
     train_logger, valid_logger = None, None
     if args.log_dir is not None:
