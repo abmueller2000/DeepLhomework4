@@ -12,7 +12,35 @@ def extract_peak(heatmap, max_pool_ks=7, min_score=-5, max_det=100):
        @return: List of peaks [(score, cx, cy), ...], where cx, cy are the position of a peak and score is the
                 heatmap value at the peak. Return no more than max_det peaks per image
     """
-    raise NotImplementedError('extract_peak')
+    # Convert heatmap to 4D tensor
+    heatmap_4d = heatmap[None, None]
+    
+    # Apply max pooling
+    pooled = F.max_pool2d(heatmap_4d, max_pool_ks, stride=1, padding=max_pool_ks//2)
+    
+    # Convert back to 2D
+    pooled = pooled[0, 0]
+    
+    # Find local maxima
+    peaks = (heatmap == pooled) & (heatmap > min_score)
+    
+    # Get coordinates and scores of local maxima
+    y, x = torch.nonzero(peaks, as_tuple=True)
+    scores = heatmap[peaks]
+    
+    # Sort scores in descending order and take top max_det detections
+    _, idx = scores.sort(descending=True)
+    idx = idx[:max_det]
+    
+    # Get final coordinates and scores
+    final_y = y[idx]
+    final_x = x[idx]
+    final_scores = scores[idx]
+    
+    # Convert to list of tuples
+    result = [(s.item(), x.item(), y.item()) for s, x, y in zip(final_scores, final_x, final_y)]
+    
+    return result
 
 
 class Detector(torch.nn.Module):
