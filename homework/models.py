@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 
 
@@ -44,21 +45,34 @@ def extract_peak(heatmap, max_pool_ks=7, min_score=-5, max_det=100):
 
 
 class Detector(torch.nn.Module):
-    def __init__(self):
-        """
-           Your code here.
-           Setup your detection network
-        """
+    class Block(nn.Module):
+        def __init__(self, n_input, n_output, kernel_size=3, stride=2):
+            super().__init__()
+            self.c1 = nn.Conv2d(n_input, n_output, kernel_size=kernel_size, padding=kernel_size // 2, stride=stride, bias=False)
+            self.c2 = nn.Conv2d(n_output, n_output, kernel_size=kernel_size, padding=kernel_size // 2, bias=False)
+            self.c3 = nn.Conv2d(n_output, n_output, kernel_size=kernel_size, padding=kernel_size // 2, bias=False)
+            self.b1 = nn.BatchNorm2d(n_output)
+            self.b2 = nn.BatchNorm2d(n_output)
+            self.b3 = nn.BatchNorm2d(n_output)
+            self.skip = nn.Conv2d(n_input, n_output, kernel_size=1, stride=stride)
+
+        def forward(self, x):
+            return F.relu(self.b3(self.c3(F.relu(self.b2(self.c2(F.relu(self.b1(self.c1(x)))))))) + self.skip(x))
+
+    def __init__(self, layers=[16, 32, 64, 128], n_output_channels=3, kernel_size=3):
         super().__init__()
-        raise NotImplementedError('Detector.__init__')
+        L = []
+        c = 3
+        for l in layers:
+            L.append(self.Block(c, l, kernel_size, 2))
+            c = l
+        self.network = nn.Sequential(*L)
+        self.heatmap_layer = nn.Conv2d(c, n_output_channels, kernel_size=1)
 
     def forward(self, x):
-        """
-           Your code here.
-           Implement a forward pass through the network, use forward for training,
-           and detect for detection
-        """
-        raise NotImplementedError('Detector.forward')
+        z = self.network(x)
+        heatmap = self.heatmap_layer(z)
+        return heatmap
 
     def detect(self, image):
         """
@@ -68,12 +82,17 @@ class Detector(torch.nn.Module):
            @return: Three list of detections [(score, cx, cy, w/2, h/2), ...], one per class,
                     return no more than 30 detections per image per class. You only need to predict width and height
                     for extra credit. If you do not predict an object size, return w=0, h=0.
-           Hint: Use extract_peak here
-           Hint: Make sure to return three python lists of tuples of (float, int, int, float, float) and not a pytorch
-                 scalar. Otherwise pytorch might keep a computation graph in the background and your program will run
-                 out of memory.
         """
-        raise NotImplementedError('Detector.detect')
+        with torch.no_grad():
+            heatmap = self.forward(image.unsqueeze(0))
+            heatmap = torch.sigmoid(heatmap).squeeze(0)
+        
+        detections = []
+        for i in range(heatmap.shape[0]):
+            peaks = extract_peak(heatmap[i])
+            detections.append([(score, cx, cy, 0, 0) for score, cx, cy in peaks])
+        
+        return detections
 
 
 def save_model(model):
