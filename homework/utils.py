@@ -26,7 +26,13 @@ class DetectionSuperTuxDataset(Dataset):
         b = self.files[idx]
         im = Image.open(b + '_im.jpg')
         nfo = np.load(b + '_boxes.npz')
-        data = im, self._filter(nfo['karts']), self._filter(nfo['bombs']), self._filter(nfo['pickup'])
+        
+        # Convert to a compatible data type
+        karts = self._filter(nfo['karts']).astype(np.float32)
+        bombs = self._filter(nfo['bombs']).astype(np.float32)
+        pickups = self._filter(nfo['pickup']).astype(np.float32)
+        
+        data = im, karts, bombs, pickups
         if self.transform is not None:
             data = self.transform(*data)
         return data

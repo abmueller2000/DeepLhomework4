@@ -45,34 +45,21 @@ def extract_peak(heatmap, max_pool_ks=7, min_score=-5, max_det=100):
 
 
 class Detector(torch.nn.Module):
-    class Block(nn.Module):
-        def __init__(self, n_input, n_output, kernel_size=3, stride=2):
-            super().__init__()
-            self.c1 = nn.Conv2d(n_input, n_output, kernel_size=kernel_size, padding=kernel_size // 2, stride=stride, bias=False)
-            self.c2 = nn.Conv2d(n_output, n_output, kernel_size=kernel_size, padding=kernel_size // 2, bias=False)
-            self.c3 = nn.Conv2d(n_output, n_output, kernel_size=kernel_size, padding=kernel_size // 2, bias=False)
-            self.b1 = nn.BatchNorm2d(n_output)
-            self.b2 = nn.BatchNorm2d(n_output)
-            self.b3 = nn.BatchNorm2d(n_output)
-            self.skip = nn.Conv2d(n_input, n_output, kernel_size=1, stride=stride)
+    def __init__(self, num_classes=3, output_channels=3):  # Update the number of classes
+        super(Detector, self).__init__()
+        self.num_classes = num_classes
+        self.output_channels = output_channels
 
-        def forward(self, x):
-            return F.relu(self.b3(self.c3(F.relu(self.b2(self.c2(F.relu(self.b1(self.c1(x)))))))) + self.skip(x))
-
-    def __init__(self, layers=[16, 32, 64, 128], n_output_channels=3, kernel_size=3):
-        super().__init__()
-        L = []
-        c = 3
-        for l in layers:
-            L.append(self.Block(c, l, kernel_size, 2))
-            c = l
-        self.network = nn.Sequential(*L)
-        self.heatmap_layer = nn.Conv2d(c, n_output_channels, kernel_size=1)
+        # Define your detection network architecture here
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.fc = nn.Conv2d(128, output_channels, kernel_size=1)
 
     def forward(self, x):
-        z = self.network(x)
-        heatmap = self.heatmap_layer(z)
-        return heatmap
+        x = nn.functional.relu(self.conv1(x))
+        x = nn.functional.relu(self.conv2(x))
+        heatmaps = self.fc(x)
+        return heatmaps
 
     def detect(self, image):
         """
@@ -81,8 +68,13 @@ class Detector(torch.nn.Module):
                 return no more than 30 detections per image per class. You only need to predict width and height
                 for extra credit. If you do not predict an object size, return w=0, h=0.
         """
+        # Convert the image to a PyTorch tensor
+        image = image.clone().detach().to(dtype=torch.float32)
+        if len(image.shape) == 3:  # Add batch dimension if missing
+            image = image.unsqueeze(0)
+
         # Forward pass to get the predicted heatmaps
-        predicted_heatmaps = self.forward(image.unsqueeze(0))
+        predicted_heatmaps = self.forward(image[None])
         
         # Initialize empty lists to store detections for each class
         kart_detections = []
@@ -95,14 +87,10 @@ class Detector(torch.nn.Module):
             peaks = extract_peak(heatmap)
             
             # Populate the detections list for each class
+            detections_list = kart_detections if label == 'kart' else bomb_detections if label == 'bomb' else pickup_detections
             for peak in peaks:
                 score, x, y = peak
-                if label == 'kart':
-                    kart_detections.append((score, x, y, 0, 0))
-                elif label == 'bomb':
-                    bomb_detections.append((score, x, y, 0, 0))
-                elif label == 'pickup':
-                    pickup_detections.append((score, x, y, 0, 0))
+                detections_list.append((score, x, y, 0, 0))
                     
         # Return detections as a tuple of lists
         return kart_detections, bomb_detections, pickup_detections
