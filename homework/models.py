@@ -74,7 +74,7 @@ class Detector(torch.nn.Module):
             image = image.unsqueeze(0)
 
         # Forward pass to get the predicted heatmaps
-        predicted_heatmaps = self.forward(image[None])
+        predicted_heatmaps = self.forward(image)
         
         # Initialize empty lists to store detections for each class
         kart_detections = []
@@ -91,7 +91,12 @@ class Detector(torch.nn.Module):
             for peak in peaks:
                 score, x, y = peak
                 detections_list.append((score, x, y, 0, 0))
-                    
+        
+        # Limit the number of detections to 30 for each class
+        kart_detections = sorted(kart_detections, reverse=True)[:30]
+        bomb_detections = sorted(bomb_detections, reverse=True)[:30]
+        pickup_detections = sorted(pickup_detections, reverse=True)[:30]
+
         # Return detections as a tuple of lists
         return kart_detections, bomb_detections, pickup_detections
 
