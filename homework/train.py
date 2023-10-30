@@ -71,14 +71,14 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('-n', '--num_epochs', type=int, default=35, help='Number of epochs')
+    parser.add_argument('-n', '--num_epochs', type=int, default=10, help='Number of epochs')
     parser.add_argument('-lr', '--learning_rate', type=float, default=1e-3, help='Learning rate')
     parser.add_argument('--batch_size', type=int, default=128, help='Batch size')
     parser.add_argument('--num_workers', type=int, default=2, help='Number of workers for data loading')
     parser.add_argument('--log-interval', type=int, default=10, help='Num of batches to wait before logging training status')
     parser.add_argument('-c', '--continue_training', action='store_true')
     parser.add_argument('-t', '--transform',
-                        default='Compose([ColorJitter(0.9, 0.9, 0.9, 0.1), RandomHorizontalFlip(), ToTensor()])')
+                        default='Compose([ColorJitter(0.9, 0.9, 0.9, 0.2), RandomHorizontalFlip(), ToTensor()])')
     parser.add_argument('--log_dir')
 
     args = parser.parse_args()
