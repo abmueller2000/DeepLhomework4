@@ -23,7 +23,11 @@ def train(args):
         model.load_state_dict(torch.load(path.join(path.dirname(path.abspath(__file__)), 'det.th')))
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=1e-5)
-    criterion = torch.nn.BCEWithLogitsLoss()
+    # Define the pos_weights tensor
+    pos_weights = torch.tensor([6, 9, 10]).to(device).view(3, 1, 1)
+    
+    # Incorporate pos_weights into the loss function
+    criterion = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weights)
 
     train_data = load_detection_data('dense_data/train', transform=transform)
     valid_data = load_detection_data('dense_data/valid')
@@ -52,7 +56,7 @@ def train(args):
 
         # validation and logging for validation can go here
 
-    torch.save(model.state_dict(), 'det.th')
+    save_model(model)
 
 
 def log(logger, imgs, gt_det, det, global_step):
@@ -71,14 +75,14 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('-n', '--num_epochs', type=int, default=10, help='Number of epochs')
+    parser.add_argument('-n', '--num_epochs', type=int, default=15, help='Number of epochs')
     parser.add_argument('-lr', '--learning_rate', type=float, default=1e-3, help='Learning rate')
     parser.add_argument('--batch_size', type=int, default=128, help='Batch size')
     parser.add_argument('--num_workers', type=int, default=2, help='Number of workers for data loading')
     parser.add_argument('--log-interval', type=int, default=10, help='Num of batches to wait before logging training status')
     parser.add_argument('-c', '--continue_training', action='store_true')
     parser.add_argument('-t', '--transform',
-                        default='Compose([ColorJitter(0.9, 0.9, 0.9, 0.2), RandomHorizontalFlip(), ToTensor()])')
+                        default='Compose([ColorJitter(0.9, 0.9, 0.9, 0.3), RandomHorizontalFlip(), ToTensor()])')
     parser.add_argument('--log_dir')
 
     args = parser.parse_args()
