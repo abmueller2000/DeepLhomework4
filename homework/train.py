@@ -22,7 +22,7 @@ def train(args):
     if args.continue_training:
         model.load_state_dict(torch.load(path.join(path.dirname(path.abspath(__file__)), 'det.th')))
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=args.learning_rate, momentum=0.9, weight_decay=1e-5)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=1e-5)
     criterion = torch.nn.BCEWithLogitsLoss()
 
     train_data = load_detection_data('dense_data/train', transform=transform)
@@ -44,15 +44,15 @@ def train(args):
 
             loss_val.backward()
             optimizer.step()
-            global_step += 1
-
+            
+            global_step+=1
             if batch_idx % args.log_interval == 0:
                 print(f'Train Epoch: {epoch} [{batch_idx * len(img)}/{len(train_data.dataset)} '
                     f'({100. * batch_idx / len(valid_data):.0f}%)]\tLoss: {loss_val.item():.6f}')
 
         # validation and logging for validation can go here
 
-        save_model(model)
+    torch.save(model.state_dict(), 'det.th')
 
 
 def log(logger, imgs, gt_det, det, global_step):
@@ -71,13 +71,15 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--log_dir')
-    parser.add_argument('--batch_size', type=int, default=64, help='Batch size')
-    parser.add_argument('-n', '--num_epochs', type=int, default=10, help='Number of epochs')
-    parser.add_argument('-lr', '--learning_rate', type=float, default=1e-2, help='Learning rate')
-    parser.add_argument('-c', '--continue_training', action='store_true')
+    parser.add_argument('-n', '--num_epochs', type=int, default=35, help='Number of epochs')
+    parser.add_argument('-lr', '--learning_rate', type=float, default=1e-3, help='Learning rate')
+    parser.add_argument('--batch_size', type=int, default=128, help='Batch size')
     parser.add_argument('--num_workers', type=int, default=2, help='Number of workers for data loading')
     parser.add_argument('--log-interval', type=int, default=10, help='Num of batches to wait before logging training status')
+    parser.add_argument('-c', '--continue_training', action='store_true')
+    parser.add_argument('-t', '--transform',
+                        default='Compose([ColorJitter(0.9, 0.9, 0.9, 0.1), RandomHorizontalFlip(), ToTensor()])')
+    parser.add_argument('--log_dir')
 
     args = parser.parse_args()
     train(args)

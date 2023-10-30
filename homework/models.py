@@ -43,21 +43,48 @@ def extract_peak(heatmap, max_pool_ks=7, min_score=-5, max_det=100):
     
     return result
 
+class ResidualBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, stride=1):
+        super(ResidualBlock, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(out_channels)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(out_channels)
+        self.stride = stride
 
-class Detector(torch.nn.Module):
-    def __init__(self, num_classes=3, output_channels=3):  # Update the number of classes
+        self.shortcut = nn.Sequential()
+        if stride != 1 or in_channels != out_channels:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride),
+                nn.BatchNorm2d(out_channels)
+            )
+            
+    def forward(self, x):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
+        out += self.shortcut(x)
+        out = F.relu(out)
+        return out
+
+class Detector(nn.Module):
+    def __init__(self, num_classes=3, output_channels=3):
         super(Detector, self).__init__()
         self.num_classes = num_classes
         self.output_channels = output_channels
 
-        # Define your detection network architecture here
         self.conv1 = nn.Conv2d(3, 64, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
-        self.fc = nn.Conv2d(128, output_channels, kernel_size=1)
+        self.res1 = ResidualBlock(64, 128, stride=2)
+        self.res2 = ResidualBlock(128, 256, stride=2)
+        self.fc = nn.Conv2d(256, output_channels, kernel_size=1)
 
     def forward(self, x):
-        x = nn.functional.relu(self.conv1(x))
-        x = nn.functional.relu(self.conv2(x))
+        x = F.relu(self.conv1(x))
+        x = self.res1(x)
+        x = self.res2(x)
+        
+        # Upsample to match the target tensor's shape
+        x = F.interpolate(x, size=(96, 128), mode='bilinear', align_corners=False)
+        
         heatmaps = self.fc(x)
         return heatmaps
 
